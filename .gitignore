@@ -23,6 +23,9 @@ env/
 backend/uploads/*
 !backend/uploads/.gitkeep
 
+# Test runtime orientation files
+backend/tests/assets/*_oriented.*
+
 # Logs & temp
 *.log
 .DS_Store

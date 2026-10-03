@@ -1,7 +1,6 @@
 """
-PaddleOCR-based Voucher Slip Parser for Morde Foods Pvt. Ltd.
-Performs orientation detection, PP-OCRv4 text detection, and 
-field-mapping onto official Morde voucher columns:
+Voucher Slip Parser for Morde Foods Pvt. Ltd.
+Performs orientation detection, token extraction, and field-mapping onto official Morde voucher columns:
 1. VOUCHER NO.
 2. DATE
 3. DEBIT
@@ -14,14 +13,17 @@ field-mapping onto official Morde voucher columns:
 """
 import os
 import re
+import cv2
 import uuid
 import datetime
-import numpy as np
-from PIL import Image
-from typing import Dict, Any, Tuple, Optional, List
 import logging
+import numpy as np
+from typing import Dict, Any, Tuple, Optional, List
+from PIL import Image
 
-logger = logging.getLogger("voucher_ocr")
+from ..manager import ocr_manager
+
+logger = logging.getLogger("ocr.voucher_parser")
 
 RESERVED_LABELS = {
     "debit", "payto", "pay to", "voucherno", "voucher no", "voucher", "date",
@@ -32,74 +34,16 @@ RESERVED_LABELS = {
     "morde foods pvt ltd", "morde foods", "head office", "factory"
 }
 
+
 def is_reserved_label(text: str) -> bool:
     clean = re.sub(r'[^a-z0-9/]', '', text.lower().strip())
     return clean in [re.sub(r'[^a-z0-9/]', '', l) for l in RESERVED_LABELS]
 
-class VoucherOcrEngine:
-    def __init__(self):
-        self._engine = None
-        self._init_engine()
 
-    def _init_engine(self):
-        try:
-            from rapidocr_onnxruntime import RapidOCR
-            self._engine = RapidOCR()
-            logger.info("Voucher RapidOCR (PaddleOCR PP-OCRv4 ONNX) engine initialized.")
-        except Exception as e:
-            logger.error(f"Failed to initialize RapidOCR for vouchers: {e}")
-            self._engine = None
-
-    @property
-    def is_ready(self) -> bool:
-        return self._engine is not None
-
-    def auto_detect_orientation(self, pil_img: Image.Image) -> int:
-        """
-        Determines the correct orientation (0, 90, 180, 270)
-        by matching Morde Foods voucher keywords.
-        """
-        if not self._engine:
-            return 0
-
-        w, h = pil_img.size
-        test_angles = [270, 90, 0, 180] if h > w else [0, 90, 180, 270]
-
-        kw_list = [
-            "morde", "foods", "voucher", "voucherno", "debit", "payto", "pay to",
-            "g/l", "gl code", "cc/io", "particulars", "cheque", "bank",
-            "accountant", "sanctioned", "prepared", "lakhs", "thousand"
-        ]
-
-        best_angle = test_angles[0]
-        best_score = -1
-
-        for angle in test_angles:
-            rot = pil_img.rotate(angle, expand=True) if angle != 0 else pil_img
-            pw = 900
-            ph = int(900 * rot.size[1] / rot.size[0])
-            preview = rot.resize((pw, ph))
-
-            res, _ = self._engine(np.array(preview))
-            if not res:
-                continue
-
-            score = 0
-            for item in res:
-                t = item[1].lower().replace(" ", "").replace(".", "")
-                for kw in kw_list:
-                    clean_kw = kw.replace(" ", "").replace(".", "").replace("/", "")
-                    if clean_kw in t:
-                        score += 3
-                if re.search(r'\d{3,6}', t):
-                    score += 1
-
-            if score > best_score:
-                best_score = score
-                best_angle = angle
-
-        logger.info(f"Voucher auto-detected orientation: {best_angle} deg (score: {best_score})")
-        return best_angle
+class VoucherParser:
+    """
+    Parser for Morde official voucher slips.
+    """
 
     def process_voucher_image(
         self, image_path: str, manual_rotation: Optional[int] = None
@@ -108,47 +52,37 @@ class VoucherOcrEngine:
         Processes voucher image with auto-rotation and OCR field extraction.
         Returns: (voucher_data_dict, oriented_image_path)
         """
-        orig_pil = Image.open(image_path)
-        w_orig, h_orig = orig_pil.size
+        img = cv2.imread(image_path)
+        if img is None:
+            raise ValueError(f"Could not load image at {image_path}")
 
-        if manual_rotation is not None and manual_rotation in [0, 90, 180, 270]:
-            angle = manual_rotation
-        else:
-            angle = self.auto_detect_orientation(orig_pil)
+        # 1. Orientation via OcrManager
+        img_oriented, _ = ocr_manager.detect_orientation(img, manual_rotation=manual_rotation)
 
-        if angle != 0:
-            oriented_pil = orig_pil.rotate(angle, expand=True)
-            dir_name = os.path.dirname(image_path)
-            base_name = os.path.splitext(os.path.basename(image_path))[0]
-            oriented_path = os.path.join(dir_name, f"{base_name}_oriented.jpg")
-            oriented_pil.save(oriented_path, quality=95)
-        else:
-            oriented_pil = orig_pil
-            oriented_path = image_path
+        base, ext = os.path.splitext(image_path)
+        oriented_path = f"{base}_oriented{ext}"
+        cv2.imwrite(oriented_path, img_oriented)
 
-        img_np = np.array(oriented_pil)
-        ocr_results, _ = self._engine(img_np) if self._engine else (None, None)
+        # 2. Token extraction via OcrManager
+        raw_tokens, provider_used = ocr_manager.extract_tokens(oriented_path)
 
         tokens = []
-        if ocr_results:
-            for item in ocr_results:
-                box = np.array(item[0]).astype(int)
-                text = str(item[1]).strip()
-                score = round(float(item[2]), 3)
-                tokens.append({
-                    "bbox": box.tolist(),
-                    "text": text,
-                    "score": score,
-                    "center_y": int(np.mean(box[:, 1])),
-                    "center_x": int(np.mean(box[:, 0]))
-                })
+        for t in raw_tokens:
+            tokens.append({
+                "bbox": t.bbox,
+                "text": t.text,
+                "score": t.confidence,
+                "center_y": int(t.y_center),
+                "center_x": int(t.x_center)
+            })
 
         voucher_data = self._extract_voucher_fields(tokens)
+        voucher_data["provider"] = provider_used
         return voucher_data, oriented_path
 
     def _extract_voucher_fields(self, tokens: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Maps extracted text tokens into the 9 voucher fields.
+        Maps extracted text tokens into the voucher fields.
         """
         data = {
             "voucher_no": "",
@@ -160,7 +94,7 @@ class VoucherOcrEngine:
             "particulars": "",
             "amount": 0.0,
             "bank_name": "",
-            "cheque_no_cash": "",
+            "cheque_no_cash": "Cash",
             "prepared_by": "",
             "accountant": "",
             "sanctioned_by": "",
@@ -168,6 +102,7 @@ class VoucherOcrEngine:
         }
 
         if not tokens:
+            data["voucher_no"] = f"VR-{datetime.date.today().strftime('%y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
             return data
 
         # 1. Voucher Number
@@ -205,7 +140,7 @@ class VoucherOcrEngine:
             elif "g/l" in txt.lower() and not is_reserved_label(txt):
                 if i + 1 < len(tokens):
                     cand = re.sub(r'\D', '', tokens[i+1]["text"])
-                    if len(cand) >= 4 and cand != "400012": # avoid mumbai pincode
+                    if len(cand) >= 4 and cand != "400012":
                         data["gl_code"] = cand
                         break
 
@@ -257,14 +192,12 @@ class VoucherOcrEngine:
         # 7. Cheque No / Cash & Bank Name
         for t in tokens:
             txt = t["text"]
-            # Look for explicit cheque string e.g. "CHQ-492104" or "Cheque No./ Cash - CHQ-492104"
             m = re.search(r'(?:cheque\s*no\.?\s*/?\s*cash\s*[:\-\.]?\s*)?(CHQ[\-_0-9]+|\b\d{6}\b)', txt, re.IGNORECASE)
             if m:
                 data["cheque_no_cash"] = m.group(1).upper()
-            elif "cash" in txt.lower() and not "cheque" in txt.lower():
+            elif "cash" in txt.lower() and "cheque" not in txt.lower():
                 data["cheque_no_cash"] = "Cash"
 
-            # Bank name
             if "state bank" in txt.lower() or "sbi" in txt.lower():
                 data["bank_name"] = "State Bank of India"
             elif "hdfc" in txt.lower():
@@ -276,7 +209,7 @@ class VoucherOcrEngine:
 
         # 8. Particulars
         particular_candidates = []
-        for i, t in enumerate(tokens):
+        for t in tokens:
             txt = t["text"]
             if is_reserved_label(txt) or txt.lower().startswith("debit") or txt.lower().startswith("pay to"):
                 continue
@@ -291,12 +224,15 @@ class VoucherOcrEngine:
             data["particulars"] = "Being amount paid towards " + " ".join(particular_candidates)
 
         # 9. Amount (Rs. Ps.)
-        # Blacklist numbers from pincode (400012), GL code (410020), or cheque number
         cheque_digits = re.sub(r'\D', '', data.get("cheque_no_cash", ""))
+        gl_digits = re.sub(r'\D', '', data.get("gl_code", ""))
+        voucher_digits = re.sub(r'\D', '', data.get("voucher_no", ""))
         amount_candidates = []
         for t in tokens:
             txt = t["text"].replace(",", "")
-            # Check for pure or decimal numbers e.g. 14500 or 14500.00
+            # Skip tokens associated with GL code, Voucher number, or Date
+            if any(lbl in txt.lower() for lbl in ["g/l", "gl code", "voucher", "date", "c/o", "cc/io"]):
+                continue
             m = re.findall(r'\b(\d{2,6}(?:\.\d{1,2})?)\b', txt)
             for num in m:
                 val = float(num)
@@ -304,6 +240,10 @@ class VoucherOcrEngine:
                 if val_str in ["400012", "410020", "2026", "2025", "2024", "1046"]:
                     continue
                 if cheque_digits and val_str == cheque_digits:
+                    continue
+                if gl_digits and val_str == gl_digits:
+                    continue
+                if voucher_digits and val_str in voucher_digits:
                     continue
                 if 100 <= val <= 2000000:
                     amount_candidates.append(val)
@@ -323,10 +263,10 @@ class VoucherOcrEngine:
             elif "sanctioned" in txt.lower() and len(txt) > 12:
                 data["sanctioned_by"] = re.sub(r'sanctioned\s*by\s*[:\-\.]?', '', txt, flags=re.IGNORECASE).strip()
 
-        if not data["voucher_no"]:
-            data["voucher_no"] = f"VR-{datetime.date.today().strftime('%y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
-
+        # Do not fabricate random voucher number; leave empty if not detected on the physical paper
         return data
 
-# Global singleton
-voucher_ocr_engine = VoucherOcrEngine()
+
+# Shared singleton & alias
+voucher_parser = VoucherParser()
+voucher_ocr_engine = voucher_parser

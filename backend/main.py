@@ -13,11 +13,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from .ocr.engine import ocr_engine
-from .ocr.parser import parse_sheet_rows, COLUMNS
-from .ocr.qa_multi_parser import qa_multi_parser, QA_SHEET_SCHEMAS
-from .ocr.voucher_parser import voucher_ocr_engine
-from .ocr.worker_parser import worker_ocr_engine
+from .ocr import (
+    ocr_manager,
+    qa_parser,
+    worker_parser,
+    voucher_parser,
+    generate_sample_quality_sheet,
+    QA_SHEET_SCHEMAS,
+    IN_PROCESS_COLUMNS
+)
 from .sap.client import sap_client
 from .sap.simulator import sap_mock_simulator
 from .db.storage import (
@@ -135,7 +139,9 @@ def extract_token(authorization: Optional[str], token_param: Optional[str] = Non
 def health_check():
     return {
         "status": "healthy",
-        "paddle_ready": ocr_engine.is_paddle_ready,
+        "paddle_ready": ocr_manager.is_paddle_ready,
+        "active_provider": ocr_manager.active_provider_name,
+        "api_ready": ocr_manager.is_api_ready,
         "sap_mode": sap_client.mode,
         "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
     }
@@ -213,6 +219,33 @@ def get_expected_columns(sheet_type: Optional[str] = "in_process"):
         ]
     }
 
+@app.post("/api/ocr/sample")
+def generate_and_process_sample():
+    sample_filename = f"SAMPLE_{uuid.uuid4().hex[:6].upper()}.jpg"
+    dest_path = os.path.join(UPLOAD_DIR, sample_filename)
+    generate_sample_quality_sheet(dest_path)
+
+    detected_sheet_type, cols, rows, oriented_path, meta = qa_parser.process_image(
+        dest_path,
+        manual_rotation=0,
+        requested_sheet_type="in_process"
+    )
+    report_id = f"RPT-SAMPLE-{uuid.uuid4().hex[:6].upper()}"
+    image_url = f"/uploads/{os.path.basename(oriented_path)}"
+    title = "In-Process Lab Quality Sheet (Sample)"
+    save_report(report_id, rows, title=title, image_url=image_url)
+
+    return {
+        "report_id": report_id,
+        "sheet_type": detected_sheet_type,
+        "sheet_title": title,
+        "image_url": image_url,
+        "columns": cols,
+        "rows": rows,
+        "metadata": meta,
+        "paddle_engine_active": True
+    }
+
 @app.post("/api/ocr/process")
 async def process_quality_sheet(
     file: UploadFile = File(...),
@@ -230,7 +263,7 @@ async def process_quality_sheet(
     with open(dest_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    detected_sheet_type, cols, rows, oriented_path, meta = qa_multi_parser.process_image(
+    detected_sheet_type, cols, rows, oriented_path, meta = qa_parser.process_image(
         dest_path,
         manual_rotation=rotation,
         requested_sheet_type=sheet_type
@@ -316,7 +349,7 @@ async def scan_worker_document(file: UploadFile = File(...), rotation: Optional[
     with open(dest_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    parsed_data, oriented_path = worker_ocr_engine.process_image(dest_path, manual_rotation=rotation)
+    parsed_data, oriented_path = worker_parser.process_image(dest_path, manual_rotation=rotation)
     metadata = parsed_data.get("metadata", {})
     rows = parsed_data.get("rows", [])
 
@@ -361,7 +394,7 @@ async def scan_voucher_document(file: UploadFile = File(...), rotation: Optional
     with open(dest_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    parsed_data, oriented_path = voucher_ocr_engine.process_voucher_image(dest_path, manual_rotation=rotation)
+    parsed_data, oriented_path = voucher_parser.process_voucher_image(dest_path, manual_rotation=rotation)
     saved_voucher = create_voucher(parsed_data)
     image_url = f"/uploads/{os.path.basename(oriented_path)}"
 
