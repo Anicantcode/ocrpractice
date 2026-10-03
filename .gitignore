@@ -1,30 +1,29 @@
-# Node / Frontend
+# Node / Next.js
 node_modules/
-frontend/node_modules/
-frontend/dist/
-frontend/build/
+.next/
+out/
+frontend/
 dist/
 build/
+*.db
+.env*.local
+.env
+
+# Archived legacy code
+archive/
+
+# Uploads runtime files
+public/uploads/*
+!public/uploads/.gitkeep
 
 # Python
 __pycache__/
-backend/__pycache__/
-backend/*/__pycache__/
-scratch/__pycache__/
 *.py[cod]
-*$py.class
 .pytest_cache/
 *.egg-info/
 .venv/
 venv/
 env/
-
-# Uploads runtime files (keep directory via .gitkeep)
-backend/uploads/*
-!backend/uploads/.gitkeep
-
-# Test runtime orientation files
-backend/tests/assets/*_oriented.*
 
 # Logs & temp
 *.log
