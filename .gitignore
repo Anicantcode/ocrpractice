@@ -1,0 +1,31 @@
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+dist/
+build/
+
+# Python
+__pycache__/
+backend/__pycache__/
+backend/*/__pycache__/
+scratch/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Uploads runtime files (keep directory via .gitkeep)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Logs & temp
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="sapGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a6ed1"/>
+      <stop offset="100%" stop-color="#001428"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#sapGrad)"/>
+  <!-- Document Sheet -->
+  <rect x="120" y="100" width="272" height="320" rx="16" fill="#ffffff" opacity="0.95"/>
+  <!-- Header Bar -->
+  <rect x="144" y="132" width="224" height="24" rx="6" fill="#0a6ed1"/>
+  <!-- Grid Lines -->
+  <line x1="144" y1="180" x2="368" y2="180" stroke="#cbd5e1" stroke-width="4"/>
+  <line x1="144" y1="220" x2="368" y2="220" stroke="#cbd5e1" stroke-width="4"/>
+  <line x1="144" y1="260" x2="368" y2="260" stroke="#cbd5e1" stroke-width="4"/>
+  <line x1="144" y1="300" x2="368" y2="300" stroke="#cbd5e1" stroke-width="4"/>
+  <line x1="144" y1="340" x2="368" y2="340" stroke="#cbd5e1" stroke-width="4"/>
+  <line x1="144" y1="380" x2="368" y2="380" stroke="#cbd5e1" stroke-width="4"/>
+  <!-- Vertical columns -->
+  <line x1="210" y1="160" x2="210" y2="380" stroke="#e2e8f0" stroke-width="3"/>
+  <line x1="290" y1="160" x2="290" y2="380" stroke="#e2e8f0" stroke-width="3"/>
+  <!-- OCR Scan Beam -->
+  <rect x="96" y="240" width="320" height="8" rx="4" fill="#f58220"/>
+  <circle cx="410" cy="244" r="14" fill="#f58220"/>
+  <!-- Checkmark Badge -->
+  <circle cx="370" cy="380" r="44" fill="#10b981"/>
+  <path d="M352 380 L365 393 L392 366" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
