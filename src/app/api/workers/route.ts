@@ -19,7 +19,12 @@ export async function GET(req: Request) {
         s.date,
         s.shift,
         s.loader_name,
-        s.supervisor
+        s.supervisor,
+        s.image_url,
+        s.image_rotation,
+        s.row_count_expected,
+        s.row_count_extracted,
+        s.row_count_status
       FROM worker_rows w
       JOIN worker_sheets s ON w.sheet_id = s.sheet_id
       ORDER BY s.created_at DESC, w.id ASC

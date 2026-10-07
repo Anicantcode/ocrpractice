@@ -1,10 +1,11 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Upload, X, FileText, CheckCircle2, AlertCircle, Sparkles, RotateCw, RotateCcw } from 'lucide-react';
+import { Camera, Upload, X, FileText, CheckCircle2, AlertCircle, RotateCw, RotateCcw } from 'lucide-react';
+import { rotateImageFile } from '../../lib/imageUtils';
 
 interface VoucherUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onScanFile: (file: File, rotation?: number) => Promise<void>;
+  onScanFile: (file: File, sourceFile?: File, rotation?: number) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -29,11 +30,11 @@ export const VoucherUploadModal: React.FC<VoucherUploadModalProps> = ({
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
 
-    // Landscape slip taken in portrait: default to 270 deg
+    // Check if smartphone photo is portrait (height > width)
     const img = new Image();
     img.onload = () => {
       if (img.naturalHeight > img.naturalWidth) {
-        setRotation(270);
+        setRotation(90);
         setIsAutoOriented(true);
       } else {
         setRotation(0);
@@ -70,31 +71,32 @@ export const VoucherUploadModal: React.FC<VoucherUploadModalProps> = ({
 
   const handleSubmit = async () => {
     if (selectedFile) {
-      await onScanFile(selectedFile, rotation);
+      const readyFile = await rotateImageFile(selectedFile, rotation);
+      await onScanFile(readyFile, selectedFile, rotation);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden border border-neutral-200">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-neutral-200">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200 bg-neutral-50/50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200 bg-neutral-50/50">
           <div>
-            <h3 className="text-sm font-bold text-neutral-900">Scan Voucher Document</h3>
-            <p className="text-xs text-neutral-500 mt-0.5">PaddleOCR (PP-OCRv4) text extraction for Morde Voucher slips</p>
+            <h3 className="text-base font-bold text-neutral-900">Scan Voucher Document</h3>
+            <p className="text-xs text-neutral-500 mt-0.5">Capture with phone camera or upload voucher photo</p>
           </div>
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition"
+            className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-5 space-y-4 text-xs">
+        <div className="p-6 space-y-4 text-xs">
           
           {/* Hidden inputs */}
           <input
@@ -118,21 +120,21 @@ export const VoucherUploadModal: React.FC<VoucherUploadModalProps> = ({
             <button
               type="button"
               onClick={() => cameraInputRef.current?.click()}
-              className="flex flex-col items-center justify-center p-3.5 rounded-lg border border-dashed border-neutral-300 hover:border-neutral-900 bg-neutral-50 hover:bg-white transition group"
+              className="flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-[#E4022D]/30 bg-[#FFF0F2]/50 hover:bg-[#FFF0F2] hover:border-[#E4022D] transition group"
             >
-              <Camera className="w-6 h-6 text-neutral-700 mb-1 group-hover:scale-105 transition-transform" />
-              <span className="text-xs font-semibold text-neutral-900">Camera Capture</span>
+              <Camera className="w-7 h-7 text-[#E4022D] mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-bold text-neutral-900">Camera Capture</span>
               <span className="text-[10px] text-neutral-500">Take photo of voucher</span>
             </button>
 
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex flex-col items-center justify-center p-3.5 rounded-lg border border-dashed border-neutral-300 hover:border-neutral-900 bg-neutral-50 hover:bg-white transition group"
+              className="flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-amber-300/50 bg-amber-50/40 hover:bg-amber-50 hover:border-amber-500 transition group"
             >
-              <Upload className="w-6 h-6 text-neutral-700 mb-1 group-hover:scale-105 transition-transform" />
-              <span className="text-xs font-semibold text-neutral-900">Browse Image</span>
-              <span className="text-[10px] text-neutral-500">JPG, PNG, WebP</span>
+              <Upload className="w-7 h-7 text-amber-700 mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-bold text-neutral-900">Browse Image</span>
+              <span className="text-[10px] text-neutral-500">JPG, PNG, PDF</span>
             </button>
           </div>
 
@@ -142,18 +144,18 @@ export const VoucherUploadModal: React.FC<VoucherUploadModalProps> = ({
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
             onDrop={handleDrop}
-            className={`relative rounded-lg border-2 border-dashed p-4 text-center transition ${
-              dragActive ? 'border-neutral-900 bg-neutral-50' : 'border-neutral-200 bg-neutral-50/60'
+            className={`relative rounded-xl border-2 border-dashed p-4 text-center transition ${
+              dragActive ? 'border-[#E4022D] bg-[#FFF0F2]' : 'border-neutral-200 bg-neutral-50/60'
             }`}
           >
             {previewUrl ? (
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between px-1">
                   <div className="flex items-center space-x-2">
-                    <span className="text-[11px] font-semibold text-neutral-900">Document Preview</span>
+                    <span className="text-[11px] font-bold text-neutral-900">Preview &amp; Orientation</span>
                     {isAutoOriented && (
-                      <span className="text-[10px] bg-neutral-200/80 text-neutral-800 px-2 py-0.5 rounded font-mono">
-                        Auto-oriented (270°)
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold border border-emerald-300">
+                        Auto-oriented to landscape
                       </span>
                     )}
                   </div>
@@ -161,30 +163,30 @@ export const VoucherUploadModal: React.FC<VoucherUploadModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setRotation((r) => (r + 270) % 360)}
-                      className="px-2 py-1 rounded bg-white hover:bg-neutral-100 text-neutral-700 text-xs border border-neutral-200 flex items-center space-x-1 transition"
-                      title="Rotate -90 deg"
+                      className="px-2.5 py-1 rounded-full bg-white hover:bg-neutral-100 text-neutral-800 text-xs border border-neutral-300 flex items-center space-x-1 shadow-sm transition"
+                      title="Rotate 90 degrees counter-clockwise"
                     >
-                      <RotateCcw className="w-3 h-3 text-neutral-600" />
+                      <RotateCcw className="w-3.5 h-3.5 text-[#E4022D]" />
                       <span>-90°</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setRotation((r) => (r + 90) % 360)}
-                      className="px-2 py-1 rounded bg-white hover:bg-neutral-100 text-neutral-700 text-xs border border-neutral-200 flex items-center space-x-1 transition"
-                      title="Rotate +90 deg"
+                      className="px-2.5 py-1 rounded-full bg-white hover:bg-neutral-100 text-neutral-800 text-xs border border-neutral-300 flex items-center space-x-1 shadow-sm transition"
+                      title="Rotate 90 degrees clockwise"
                     >
-                      <RotateCw className="w-3 h-3 text-neutral-600" />
+                      <RotateCw className="w-3.5 h-3.5 text-[#E4022D]" />
                       <span>+90°</span>
                     </button>
                   </div>
                 </div>
 
-                <div className="relative max-h-48 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-900 flex items-center justify-center p-2">
+                <div className="relative max-h-52 overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 flex items-center justify-center p-2">
                   <img
                     src={previewUrl}
                     alt="Voucher Document preview"
                     style={{ transform: `rotate(${rotation}deg)` }}
-                    className="max-h-44 w-auto object-contain transition-transform duration-200"
+                    className="max-h-48 w-auto object-contain transition-transform duration-200"
                   />
                 </div>
 
@@ -196,27 +198,27 @@ export const VoucherUploadModal: React.FC<VoucherUploadModalProps> = ({
             ) : (
               <div className="py-4 space-y-1">
                 <FileText className="w-8 h-8 text-neutral-400 mx-auto" />
-                <p className="text-xs text-neutral-800 font-medium">Or drag &amp; drop physical voucher slip here</p>
+                <p className="text-xs text-neutral-800 font-semibold">Or drag &amp; drop physical voucher slip here</p>
                 <p className="text-[10px] text-neutral-400">Supports photos of handwritten or printed Morde vouchers</p>
               </div>
             )}
           </div>
 
-          <div className="rounded-lg bg-neutral-50 border border-neutral-200 p-2.5 flex items-start space-x-2">
-            <AlertCircle className="w-3.5 h-3.5 text-neutral-500 flex-shrink-0 mt-0.5" />
-            <p className="text-[11px] text-neutral-600 leading-tight">
-              PaddleOCR will automatically detect company header, voucher #, G/L code, debit account, payee, particulars, and amount.
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 flex items-start space-x-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
+            <p className="text-[11px] text-amber-900 leading-tight">
+              <strong>Tip:</strong> Ensure voucher number, amounts, payee, and account particulars are clearly visible.
             </p>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 bg-neutral-50/50 border-t border-neutral-200 flex items-center justify-end space-x-2.5">
+        <div className="px-6 py-4 bg-neutral-50/50 border-t border-neutral-200 flex items-center justify-end space-x-3">
           <button
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="px-3 py-1.5 text-xs font-medium text-neutral-600 hover:text-neutral-900 transition"
+            className="px-4 py-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition"
           >
             Cancel
           </button>
@@ -225,16 +227,16 @@ export const VoucherUploadModal: React.FC<VoucherUploadModalProps> = ({
             type="button"
             onClick={handleSubmit}
             disabled={!selectedFile || isLoading}
-            className="px-4 py-2 rounded-lg bg-[#E4022D] hover:bg-[#C40226] text-white text-xs font-semibold shadow-sm disabled:opacity-50 transition flex items-center space-x-1.5"
+            className="px-6 py-2.5 rounded-full bg-[#E4022D] hover:bg-[#C40226] text-white text-xs sm:text-sm font-bold shadow-md shadow-red-950/20 disabled:opacity-50 transition flex items-center space-x-2"
           >
             {isLoading ? (
               <>
                 <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Reading with PaddleOCR…</span>
+                <span>Scanning Document...</span>
               </>
             ) : (
               <>
-                <CheckCircle2 className="w-3.5 h-3.5" />
+                <CheckCircle2 className="w-4 h-4" />
                 <span>Scan Document</span>
               </>
             )}

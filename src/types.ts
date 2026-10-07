@@ -121,6 +121,11 @@ export interface WorkerItem {
   gang_leader_name: string;
   shift: string;
   sr_no: string;
+  place?: string;
+  type?: string;
+  particulars?: string;
+  category?: 'RM' | 'PM' | 'FG' | 'OTHER' | string;
+  units_kg?: string;
   working_detail: string;
   rate: string;
   vehicle_no: string;
@@ -128,6 +133,16 @@ export interface WorkerItem {
   pallets: number;
   qty: string;
   product_code: string;
+  amount?: number | null;
+  lookup_key?: string;
+  rate_matched?: boolean;
+  source_working_detail?: string;
+  source_place?: string;
+  source_type?: string;
+  source_particulars?: string;
+  source_remark?: string;
+  translation_needs_review?: boolean;
+  review_required?: boolean;
   remark: string;
   image_url?: string;
   created_at?: string;
@@ -138,6 +153,9 @@ export interface WorkerSheetMetadata {
   gang_leader_name: string;
   shift: string;
   sr_no: string;
+  row_count_expected?: number | null;
+  row_count_extracted?: number;
+  row_count_status?: 'MATCH' | 'MISMATCH' | 'COUNT_UNCERTAIN';
 }
 
 // ----------------- Vouchers Module Types -----------------
@@ -151,7 +169,13 @@ export interface VoucherItem {
   gl_code: string;
   cost_center: string;
   particulars: string;
-  amount: number;
+  amount: number | null;
+  voucher_no_generated?: boolean | number;
+  review_required?: boolean;
+  coverage_status?: 'MATCH' | 'MISMATCH' | 'COUNT_UNCERTAIN' | null;
+  coverage_missing_fields?: string[];
+  coverage_extra_fields?: string[];
+  voucher_form_detected?: boolean | null;
   bank_name?: string;
   cheque_no_cash: string;
   prepared_by: string;

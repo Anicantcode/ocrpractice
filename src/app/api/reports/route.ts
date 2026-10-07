@@ -10,6 +10,10 @@ export async function GET() {
         r.title,
         r.status,
         r.image_url,
+        r.image_rotation,
+        r.row_count_expected,
+        r.row_count_extracted,
+        r.row_count_status,
         r.created_at,
         count(w.id) as row_count
       FROM quality_reports r

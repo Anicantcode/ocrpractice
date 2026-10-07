@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Download, X, Clock, RefreshCw, Printer, Camera, FileCheck2 } from 'lucide-react';
+import { Search, Download, X, Clock, RefreshCw, Printer, Camera, FileCheck2, RotateCcw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { VoucherItem, User } from '../../types';
 import { VoucherUploadModal } from './VoucherUploadModal';
+import { DocumentPreview } from '../DocumentPreview';
 
 interface VouchersModuleProps {
   currentUser?: User;
 }
 
-function parseAmount(amt: number) {
+function parseAmount(amt: number | null) {
+  if (amt === null || !Number.isFinite(amt)) return { rs: '', ps: '' };
   const rs = Math.floor(amt);
   const ps = Math.round((amt - rs) * 100);
   return {
@@ -17,7 +19,8 @@ function parseAmount(amt: number) {
   };
 }
 
-function amountToWords(amt: number) {
+function amountToWords(amt: number | null) {
+  if (amt === null || !Number.isFinite(amt)) return { lakhs: '——', thousands: '——', hundreds: '——', ps: '——' };
   const intPart = Math.floor(amt);
   const ps = Math.round((amt - intPart) * 100);
 
@@ -36,22 +39,25 @@ function amountToWords(amt: number) {
 
 export const VouchersModule: React.FC<VouchersModuleProps> = ({ currentUser: _currentUser }) => {
   const [vouchers, setVouchers] = useState<VoucherItem[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  // PaddleOCR Scan Document Modal
+  // Scan Document Modal
   const [isScanOpen, setIsScanOpen] = useState<boolean>(false);
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [scannedImageUrl, setScannedImageUrl] = useState<string>('');
+  const [imageRotation, setImageRotation] = useState<number>(0);
   const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState<boolean>(false);
   const [highlightedVoucherNo, setHighlightedVoucherNo] = useState<string | null>(null);
 
   // View Physical Slip Modal
   const [activeSlip, setActiveSlip] = useState<VoucherItem | null>(null);
 
-  useEffect(() => {
-    fetchVouchers();
-  }, []);
+  const handleClearSlate = () => {
+    setVouchers([]);
+    setScannedImageUrl('');
+    setHighlightedVoucherNo(null);
+  };
 
   const fetchVouchers = async () => {
     setIsLoading(true);
@@ -68,10 +74,11 @@ export const VouchersModule: React.FC<VouchersModuleProps> = ({ currentUser: _cu
     }
   };
 
-  const handleScanFile = async (file: File, rotation?: number) => {
+  const handleScanFile = async (file: File, sourceFile?: File, rotation?: number) => {
     setIsScanning(true);
     const formData = new FormData();
     formData.append('file', file);
+    if (sourceFile) formData.append('source_file', sourceFile);
     if (rotation !== undefined) {
       formData.append('rotation', String(rotation));
     }
@@ -83,22 +90,23 @@ export const VouchersModule: React.FC<VouchersModuleProps> = ({ currentUser: _cu
       });
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(errText || 'Failed to scan voucher with PaddleOCR');
+        throw new Error(errText || 'Failed to scan voucher document');
       }
+      const localUrl = URL.createObjectURL(sourceFile || file);
       const data = await res.json();
       if (data.voucher) {
+        const voucherWithImg = { ...data.voucher, image_url: data.voucher.image_url || localUrl };
         setVouchers((prev) => {
           const filtered = prev.filter((v) => v.voucher_no !== data.voucher.voucher_no);
-          return [data.voucher, ...filtered];
+          return [voucherWithImg, ...filtered];
         });
         setHighlightedVoucherNo(data.voucher.voucher_no);
       }
-      if (data.image_url) {
-        setScannedImageUrl(data.image_url);
-      }
+      setScannedImageUrl(data.image_url || localUrl);
+      setImageRotation(data.image_rotation || 0);
       setIsScanOpen(false);
     } catch (err: any) {
-      alert(`PaddleOCR Scanning Error: ${err.message || err}`);
+      alert(`Scanning Error: ${err.message || err}`);
     } finally {
       setIsScanning(false);
     }
@@ -168,7 +176,7 @@ export const VouchersModule: React.FC<VouchersModuleProps> = ({ currentUser: _cu
             Morde Foods Debit Vouchers
           </h1>
           <p className="text-xs text-neutral-500">
-            PaddleOCR (PP-OCRv4) automated voucher scanner for Morde Foods voucher slips.
+            Automated scanner and ledger for Morde Foods voucher slips.
           </p>
         </div>
 
@@ -197,6 +205,17 @@ export const VouchersModule: React.FC<VouchersModuleProps> = ({ currentUser: _cu
             >
               <FileCheck2 className="w-3.5 h-3.5 text-neutral-500" />
               <span>View Sheet Photo</span>
+            </button>
+          )}
+
+          {vouchers.length > 0 && (
+            <button
+              onClick={handleClearSlate}
+              className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-medium text-neutral-600 bg-white hover:bg-neutral-50 border border-neutral-200/90 transition shadow-sm hover:text-red-600"
+              title="Clear vouchers and start new slate"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-neutral-400 group-hover:text-red-500" />
+              <span>New Slate</span>
             </button>
           )}
 
@@ -253,6 +272,7 @@ export const VouchersModule: React.FC<VouchersModuleProps> = ({ currentUser: _cu
               {filteredVouchers.map((v) => {
                 const { rs, ps } = parseAmount(v.amount);
                 const isNew = highlightedVoucherNo === v.voucher_no;
+                const needsReview = v.review_required ?? (v.amount === null || !v.date || !v.pay_to || !v.gl_code || !v.cost_center || v.coverage_status !== 'MATCH');
                 return (
                   <tr
                     key={v.voucher_no}
@@ -268,6 +288,9 @@ export const VouchersModule: React.FC<VouchersModuleProps> = ({ currentUser: _cu
                       >
                         {v.voucher_no}
                       </button>
+                      {Boolean(v.voucher_no_generated) && <span className="ml-1 block text-[9px] font-normal text-amber-700">system ID · source number unread</span>}
+                      {needsReview && <span className="ml-1 block text-[9px] font-normal text-amber-700">review missing fields</span>}
+                      {v.coverage_status && v.coverage_status !== 'MATCH' && <span className="ml-1 block text-[9px] font-normal text-amber-700">form coverage: {v.coverage_status.toLowerCase().replaceAll('_', ' ')}</span>}
                     </td>
                     <td className="py-2.5 px-3 text-neutral-600 font-mono text-xs whitespace-nowrap">
                       {v.date}
@@ -309,7 +332,7 @@ export const VouchersModule: React.FC<VouchersModuleProps> = ({ currentUser: _cu
         </div>
       </div>
 
-      {/* PaddleOCR Scan Voucher Modal */}
+      {/* Scan Voucher Modal */}
       <VoucherUploadModal
         isOpen={isScanOpen}
         onClose={() => setIsScanOpen(false)}
@@ -320,10 +343,10 @@ export const VouchersModule: React.FC<VouchersModuleProps> = ({ currentUser: _cu
       {/* Scanned Photo Viewer Modal */}
       {isPhotoViewerOpen && scannedImageUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-xl p-4 max-w-3xl w-full shadow-2xl border border-neutral-200 relative">
+          <div className="bg-white rounded-xl p-4 max-w-6xl w-full shadow-2xl border border-neutral-200 relative">
             <div className="flex items-center justify-between pb-3 border-b border-neutral-200">
               <h3 className="text-sm font-semibold text-neutral-900">
-                Scanned Voucher Photo (PaddleOCR Processed)
+                Scanned Voucher Photo
               </h3>
               <button
                 onClick={() => setIsPhotoViewerOpen(false)}
@@ -332,12 +355,13 @@ export const VouchersModule: React.FC<VouchersModuleProps> = ({ currentUser: _cu
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="mt-3 flex items-center justify-center bg-neutral-950 rounded-lg overflow-hidden max-h-[75vh] p-2">
-              <img
-                src={scannedImageUrl}
-                alt="Scanned Voucher Sheet"
-                className="max-h-[70vh] w-auto object-contain"
-              />
+            <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-4 max-h-[78vh] overflow-auto">
+              <div className="flex items-center justify-center bg-neutral-950 rounded-lg min-h-80 p-2"><DocumentPreview src={scannedImageUrl} alt="Original voucher document" rotation={imageRotation} className="max-h-[70vh] max-w-full w-auto object-contain" /></div>
+              <div className="border rounded-lg overflow-auto text-sm">
+                <div className="px-3 py-2 font-semibold bg-neutral-50 border-b">Extracted values — compare with source</div>
+                {vouchers.find(v => v.voucher_no === highlightedVoucherNo)?.coverage_status && <div className="px-3 py-2 border-b bg-amber-50 text-amber-900">Voucher form coverage: {vouchers.find(v => v.voucher_no === highlightedVoucherNo)?.coverage_status}. {((vouchers.find(v => v.voucher_no === highlightedVoucherNo)?.coverage_missing_fields || []).length > 0) ? `Audit saw filled fields not extracted: ${vouchers.find(v => v.voucher_no === highlightedVoucherNo)?.coverage_missing_fields?.join(', ')}.` : ''} {((vouchers.find(v => v.voucher_no === highlightedVoucherNo)?.coverage_extra_fields || []).length > 0) ? `Extracted fields not confirmed by audit: ${vouchers.find(v => v.voucher_no === highlightedVoucherNo)?.coverage_extra_fields?.join(', ')}.` : ''}</div>}
+                {vouchers.find(v => v.voucher_no === highlightedVoucherNo) ? Object.entries(vouchers.find(v => v.voucher_no === highlightedVoucherNo)!).filter(([key]) => !['id','created_at','image_url'].includes(key)).map(([key,value])=><div key={key} className="px-3 py-2 border-b flex gap-3"><span className="w-36 shrink-0 text-neutral-500">{key.replaceAll('_',' ')}</span><span className="break-words">{value === null || value === '' ? '—' : String(value)}</span></div>) : <div className="p-3 text-neutral-500">No extracted voucher fields.</div>}
+              </div>
             </div>
           </div>
         </div>

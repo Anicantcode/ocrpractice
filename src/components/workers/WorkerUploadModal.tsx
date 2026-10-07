@@ -1,10 +1,11 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Upload, X, FileText, CheckCircle2, AlertCircle, Sparkles, RotateCw, RotateCcw } from 'lucide-react';
+import { Camera, Upload, X, FileText, CheckCircle2, AlertCircle, RotateCw, RotateCcw } from 'lucide-react';
+import { rotateImageFile } from '../../lib/imageUtils';
 
 interface WorkerUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onScanFile: (file: File, rotation?: number) => Promise<void>;
+  onScanFile: (file: File, sourceFile?: File, rotation?: number) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -18,6 +19,7 @@ export const WorkerUploadModal: React.FC<WorkerUploadModalProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [rotation, setRotation] = useState<number>(0);
+  const [isAutoOriented, setIsAutoOriented] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -27,7 +29,19 @@ export const WorkerUploadModal: React.FC<WorkerUploadModalProps> = ({
     setSelectedFile(file);
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
-    setRotation(0);
+
+    // Check if smartphone photo is portrait (height > width)
+    const img = new Image();
+    img.onload = () => {
+      if (img.naturalHeight > img.naturalWidth) {
+        setRotation(90);
+        setIsAutoOriented(true);
+      } else {
+        setRotation(0);
+        setIsAutoOriented(false);
+      }
+    };
+    img.src = url;
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,31 +71,32 @@ export const WorkerUploadModal: React.FC<WorkerUploadModalProps> = ({
 
   const handleSubmit = async () => {
     if (selectedFile) {
-      await onScanFile(selectedFile, rotation);
+      const readyFile = await rotateImageFile(selectedFile, rotation);
+      await onScanFile(readyFile, selectedFile, rotation);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden border border-neutral-200">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-neutral-200">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200 bg-neutral-50/50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200 bg-neutral-50/50">
           <div>
-            <h3 className="text-sm font-bold text-neutral-900">Scan Loader Working Sheet</h3>
-            <p className="text-xs text-neutral-500 mt-0.5">PaddleOCR with mixed Marathi & English translation for Loader Daily Working Detail</p>
+            <h3 className="text-base font-bold text-neutral-900">Scan Loader Working Sheet</h3>
+            <p className="text-xs text-neutral-500 mt-0.5">Capture with phone camera or upload loader working sheet</p>
           </div>
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition"
+            className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-5 space-y-4 text-xs">
+        <div className="p-6 space-y-4 text-xs">
           
           {/* Hidden inputs */}
           <input
@@ -105,21 +120,21 @@ export const WorkerUploadModal: React.FC<WorkerUploadModalProps> = ({
             <button
               type="button"
               onClick={() => cameraInputRef.current?.click()}
-              className="flex flex-col items-center justify-center p-3.5 rounded-lg border border-dashed border-neutral-300 hover:border-neutral-900 bg-neutral-50 hover:bg-white transition group"
+              className="flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-[#E4022D]/30 bg-[#FFF0F2]/50 hover:bg-[#FFF0F2] hover:border-[#E4022D] transition group"
             >
-              <Camera className="w-6 h-6 text-neutral-700 mb-1 group-hover:scale-105 transition-transform" />
-              <span className="text-xs font-semibold text-neutral-900">Camera Capture</span>
+              <Camera className="w-7 h-7 text-[#E4022D] mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-bold text-neutral-900">Camera Capture</span>
               <span className="text-[10px] text-neutral-500">Take photo of sheet</span>
             </button>
 
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex flex-col items-center justify-center p-3.5 rounded-lg border border-dashed border-neutral-300 hover:border-neutral-900 bg-neutral-50 hover:bg-white transition group"
+              className="flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-amber-300/50 bg-amber-50/40 hover:bg-amber-50 hover:border-amber-500 transition group"
             >
-              <Upload className="w-6 h-6 text-neutral-700 mb-1 group-hover:scale-105 transition-transform" />
-              <span className="text-xs font-semibold text-neutral-900">Browse Image</span>
-              <span className="text-[10px] text-neutral-500">JPG, PNG, WebP</span>
+              <Upload className="w-7 h-7 text-amber-700 mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-bold text-neutral-900">Browse Image</span>
+              <span className="text-[10px] text-neutral-500">JPG, PNG, PDF</span>
             </button>
           </div>
 
@@ -127,80 +142,84 @@ export const WorkerUploadModal: React.FC<WorkerUploadModalProps> = ({
           <div
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
-            onDragOver={handleDrag}
             onDrop={handleDrop}
-            className={`border rounded-lg p-3 text-center transition-all ${
-              dragActive
-                ? 'border-neutral-900 bg-neutral-50'
-                : 'border-neutral-200 bg-neutral-50/30'
+            className={`relative rounded-xl border-2 border-dashed p-4 text-center transition ${
+              dragActive ? 'border-[#E4022D] bg-[#FFF0F2]' : 'border-neutral-200 bg-neutral-50/60'
             }`}
           >
             {previewUrl ? (
-              <div className="space-y-3">
-                <div className="relative max-h-56 overflow-hidden rounded border border-neutral-200 bg-neutral-950/5 flex items-center justify-center">
-                  <img
-                    src={previewUrl}
-                    alt="Preview"
-                    style={{ transform: `rotate(${rotation}deg)` }}
-                    className="max-h-52 object-contain transition-transform duration-200 shadow-sm"
-                  />
-                </div>
-
+              <div className="space-y-2.5">
                 <div className="flex items-center justify-between px-1">
                   <div className="flex items-center space-x-2">
-                    <FileText className="w-4 h-4 text-neutral-500" />
-                    <span className="font-mono text-neutral-700 truncate max-w-[200px]">
-                      {selectedFile?.name}
-                    </span>
+                    <span className="text-[11px] font-bold text-neutral-900">Preview &amp; Orientation</span>
+                    {isAutoOriented && (
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold border border-emerald-300">
+                        Auto-oriented to landscape
+                      </span>
+                    )}
                   </div>
-
                   <div className="flex items-center space-x-1.5">
                     <button
                       type="button"
-                      onClick={() => setRotation((r) => (r - 90 + 360) % 360)}
-                      className="px-2 py-1 rounded bg-white hover:bg-neutral-100 border border-neutral-200 text-neutral-700 flex items-center space-x-1 text-[11px]"
-                      title="Rotate counter-clockwise"
+                      onClick={() => setRotation((r) => (r + 270) % 360)}
+                      className="px-2.5 py-1 rounded-full bg-white hover:bg-neutral-100 text-neutral-800 text-xs border border-neutral-300 flex items-center space-x-1 shadow-sm transition"
+                      title="Rotate 90 degrees counter-clockwise"
                     >
-                      <RotateCcw className="w-3 h-3" />
+                      <RotateCcw className="w-3.5 h-3.5 text-[#E4022D]" />
                       <span>-90°</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setRotation((r) => (r + 90) % 360)}
-                      className="px-2 py-1 rounded bg-white hover:bg-neutral-100 border border-neutral-200 text-neutral-700 flex items-center space-x-1 text-[11px]"
-                      title="Rotate clockwise"
+                      className="px-2.5 py-1 rounded-full bg-white hover:bg-neutral-100 text-neutral-800 text-xs border border-neutral-300 flex items-center space-x-1 shadow-sm transition"
+                      title="Rotate 90 degrees clockwise"
                     >
-                      <RotateCw className="w-3 h-3" />
+                      <RotateCw className="w-3.5 h-3.5 text-[#E4022D]" />
                       <span>+90°</span>
                     </button>
                   </div>
                 </div>
+
+                <div className="relative max-h-52 overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 flex items-center justify-center p-2">
+                  <img
+                    src={previewUrl}
+                    alt="Working sheet preview"
+                    style={{ transform: `rotate(${rotation}deg)` }}
+                    className="max-h-48 w-auto object-contain transition-transform duration-200"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-neutral-500 px-1 font-mono">
+                  <span className="truncate max-w-[200px]">{selectedFile?.name}</span>
+                  <span className="font-semibold text-neutral-700">Rotation: {rotation}°</span>
+                </div>
               </div>
             ) : (
-              <div className="py-6">
-                <p className="text-neutral-500">Drag and drop Loader Daily Working Detail sheet here</p>
-                <p className="text-[10px] text-neutral-400 mt-1 font-mono">Accepts camera photos, carbon slips, scanned JPG/PNG</p>
+              <div className="py-4 space-y-1">
+                <FileText className="w-8 h-8 text-neutral-400 mx-auto" />
+                <p className="text-xs text-neutral-800 font-semibold">Or drag &amp; drop Loader Daily Working Detail sheet here</p>
+                <p className="text-[10px] text-neutral-400">Accepts camera photos, carbon slips, scanned JPG/PNG</p>
               </div>
             )}
           </div>
 
-          {/* Info pill */}
-          <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-2.5 flex items-start space-x-2 text-amber-900">
-            <Sparkles className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-            <div className="text-[11px] leading-relaxed">
-              <span className="font-semibold">Bilingual Extraction:</span> Automatically translates handwritten Marathi terms (<span className="font-mono">गाड्यांमधी, परिसर, कंपनी, गोडाऊन, थापी</span>) and names into English, populating the 8 physical columns with zero mock data.
-            </div>
+          {/* Info tip */}
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 flex items-start space-x-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
+            <p className="text-[11px] text-amber-900 leading-tight">
+              <strong>Tip:</strong> Ensure worker names, shift times, vehicle numbers, and pallet counts are clearly visible.
+            </p>
           </div>
 
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end space-x-2 px-5 py-3 border-t border-neutral-200 bg-neutral-50/50">
+        <div className="px-6 py-4 bg-neutral-50/50 border-t border-neutral-200 flex items-center justify-end space-x-3">
           <button
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="px-3.5 py-1.5 rounded-lg border border-neutral-200 text-neutral-700 hover:bg-neutral-100 font-medium transition"
+            className="px-4 py-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition"
           >
             Cancel
           </button>
@@ -208,17 +227,17 @@ export const WorkerUploadModal: React.FC<WorkerUploadModalProps> = ({
             type="button"
             onClick={handleSubmit}
             disabled={!selectedFile || isLoading}
-            className="px-4 py-1.5 rounded-lg bg-[#E4022D] hover:bg-[#C40226] text-white font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1.5 shadow-sm"
+            className="px-6 py-2.5 rounded-full bg-[#E4022D] hover:bg-[#C40226] text-white text-xs sm:text-sm font-bold shadow-md shadow-red-950/20 disabled:opacity-50 transition flex items-center space-x-2"
           >
             {isLoading ? (
               <>
-                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Processing OCR & Translation...</span>
+                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Scanning Document...</span>
               </>
             ) : (
               <>
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Process Document</span>
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Scan Document</span>
               </>
             )}
           </button>

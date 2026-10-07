@@ -14,9 +14,24 @@ export async function GET(req: Request) {
       vouchers = db.prepare('SELECT * FROM vouchers ORDER BY created_at DESC').all();
     }
 
-    return NextResponse.json(vouchers);
+    return NextResponse.json(vouchers.map((voucher: any) => ({
+      ...voucher,
+      coverage_missing_fields: parseStoredFieldList(voucher.coverage_missing_fields),
+      coverage_extra_fields: parseStoredFieldList(voucher.coverage_extra_fields),
+      voucher_form_detected: voucher.voucher_form_detected === null || voucher.voucher_form_detected === undefined ? null : Boolean(voucher.voucher_form_detected),
+      review_required: voucher.coverage_status !== 'MATCH' || voucher.amount === null || !voucher.date || !voucher.pay_to || !voucher.gl_code || !voucher.cost_center
+    })));
   } catch (err: any) {
     return NextResponse.json({ detail: err.message }, { status: 500 });
+  }
+}
+
+function parseStoredFieldList(value: unknown): string[] {
+  try {
+    const parsed = JSON.parse(String(value || '[]'));
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
   }
 }
 
@@ -35,16 +50,16 @@ export async function POST(req: Request) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       voucherNo,
-      body.date || new Date().toISOString().split('T')[0],
+      body.date || '',
       body.debit_account || '',
       body.pay_to || '',
-      body.gl_code || '410000',
-      body.cost_center || 'FACTORY-01',
+      body.gl_code || '',
+      body.cost_center || '',
       body.particulars || '',
-      typeof body.amount === 'number' ? body.amount : (parseFloat(body.amount) || 0.0),
+      typeof body.amount === 'number' && Number.isFinite(body.amount) ? body.amount : null,
       body.bank_name || '',
-      body.cheque_no_cash || 'Cash',
-      body.prepared_by || 'Staff',
+      body.cheque_no_cash || '',
+      body.prepared_by || '',
       body.accountant || '',
       body.sanctioned_by || '',
       body.status || 'Prepared',

@@ -15,58 +15,8 @@ interface QualitySheetGridProps {
   reportId?: string;
 }
 
-export const SHEET_COLUMNS: Record<QaSheetType, { key: string; label: string; minWidth?: string }[]> = {
-  finished_goods: [
-    { key: 'Product Name', label: 'Product Name', minWidth: 'min-w-[170px]' },
-    { key: 'Code', label: 'Code', minWidth: 'min-w-[90px]' },
-    { key: 'B.NO', label: 'B.NO', minWidth: 'min-w-[110px]' },
-    { key: 'Moisture W1', label: 'Moisture W1', minWidth: 'min-w-[85px]' },
-    { key: 'Moisture W2', label: 'Moisture W2', minWidth: 'min-w-[85px]' },
-    { key: 'Moisture W', label: 'Moisture W', minWidth: 'min-w-[85px]' },
-    { key: 'Moisture W3', label: 'Moisture W3', minWidth: 'min-w-[85px]' },
-    { key: 'M%', label: 'M%', minWidth: 'min-w-[75px]' },
-    { key: 'Fat W1', label: 'Fat W1', minWidth: 'min-w-[85px]' },
-    { key: 'Fat W2', label: 'Fat W2', minWidth: 'min-w-[85px]' },
-    { key: 'Fat W', label: 'Fat W', minWidth: 'min-w-[85px]' },
-    { key: 'Fat W3', label: 'Fat W3', minWidth: 'min-w-[85px]' },
-    { key: 'F%', label: 'F%', minWidth: 'min-w-[75px]' },
-    { key: 'pH', label: 'pH', minWidth: 'min-w-[65px]' },
-    { key: 'PS', label: 'PS (μ)', minWidth: 'min-w-[75px]' },
-    { key: 'Colour L*', label: 'L*', minWidth: 'min-w-[65px]' },
-    { key: 'Colour a*', label: 'a*', minWidth: 'min-w-[65px]' },
-    { key: 'Colour b*', label: 'b*', minWidth: 'min-w-[65px]' },
-    { key: 'Count', label: 'Count', minWidth: 'min-w-[75px]' },
-  ],
-  microbiological: [
-    { key: 'Sr. No.', label: 'Sr. No.', minWidth: 'min-w-[60px]' },
-    { key: 'Batch No.', label: 'Batch No.', minWidth: 'min-w-[115px]' },
-    { key: 'Code No.', label: 'Code No.', minWidth: 'min-w-[100px]' },
-    { key: 'Product Name', label: 'Product Name', minWidth: 'min-w-[170px]' },
-    { key: 'TPC 10¹', label: '10¹', minWidth: 'min-w-[65px]' },
-    { key: 'TPC 10²', label: '10²', minWidth: 'min-w-[65px]' },
-    { key: 'TPC 10³', label: '10³', minWidth: 'min-w-[65px]' },
-    { key: 'TPC Total', label: 'TPC Total (CFU/gm)', minWidth: 'min-w-[125px]' },
-    { key: 'Y&M', label: 'Y&M (CFU/gm)', minWidth: 'min-w-[105px]' },
-    { key: 'Coliform', label: 'Coliform (CFU/gm)', minWidth: 'min-w-[110px]' },
-    { key: 'E.coli', label: 'E.coli (CFU/gm)', minWidth: 'min-w-[100px]' },
-    { key: 'Enterobacteriaceae', label: 'Enterobacteriaceae', minWidth: 'min-w-[130px]' },
-    { key: 'Remark', label: 'Remark', minWidth: 'min-w-[95px]' },
-  ],
-  in_process: [
-    { key: 'sr no', label: 'Sr No', minWidth: 'min-w-[60px]' },
-    { key: 'date', label: 'Date', minWidth: 'min-w-[100px]' },
-    { key: 'Batch Number', label: 'Batch Number', minWidth: 'min-w-[130px]' },
-    { key: 'product code', label: 'Product Code', minWidth: 'min-w-[110px]' },
-    { key: 'paper weight', label: 'Paper Wt (g)', minWidth: 'min-w-[105px]' },
-    { key: 'sample paper weight', label: 'Sample Paper Wt (g)', minWidth: 'min-w-[120px]' },
-    { key: 'sample weight', label: 'Sample Wt (g)', minWidth: 'min-w-[105px]' },
-    { key: 'after drying weight', label: 'After Drying Wt (g)', minWidth: 'min-w-[120px]' },
-    { key: 'fat %', label: 'Fat %', minWidth: 'min-w-[85px]' },
-    { key: 'moisture %', label: 'Moisture %', minWidth: 'min-w-[90px]' },
-    { key: 'ph', label: 'pH', minWidth: 'min-w-[75px]' },
-    { key: 'particle size', label: 'Particle Size', minWidth: 'min-w-[105px]' },
-  ],
-};
+export { SHEET_COLUMNS } from '../lib/constants';
+import { SHEET_COLUMNS } from '../lib/constants';
 
 export const QualitySheetGrid: React.FC<QualitySheetGridProps> = ({
   rows,
@@ -178,24 +128,6 @@ export const QualitySheetGrid: React.FC<QualitySheetGridProps> = ({
             <Plus className="w-3.5 h-3.5 text-neutral-500" />
             <span>Add Row</span>
           </button>
-
-          <button
-            onClick={handleExportExcel}
-            disabled={rows.length === 0}
-            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-700 bg-white hover:bg-neutral-50 border border-neutral-200/90 shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Download className="w-3.5 h-3.5 text-neutral-500" />
-            <span>Export CSV</span>
-          </button>
-
-          <button
-            onClick={onOpenSapSync}
-            disabled={rows.length === 0}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>Sync to SAP</span>
-          </button>
         </div>
 
       </div>
@@ -230,6 +162,7 @@ export const QualitySheetGrid: React.FC<QualitySheetGridProps> = ({
                 {activeColumns.map((col) => {
                   const val = row[col.key] !== undefined && row[col.key] !== null ? String(row[col.key]) : '';
                   const isBatchOrCode = col.key.toLowerCase().includes('batch') || col.key.toLowerCase().includes('code') || col.key === 'B.NO';
+                  const needsReview = Array.isArray(row._review_flags) && row._review_flags.includes(col.key);
 
                   return (
                     <td key={col.key} className="py-1 px-1.5">
@@ -238,7 +171,8 @@ export const QualitySheetGrid: React.FC<QualitySheetGridProps> = ({
                         value={val}
                         placeholder="—"
                         onChange={(e) => handleCellChange(rowIdx, col.key, e.target.value)}
-                        className={`w-full px-2 py-1 text-xs rounded border border-transparent hover:border-neutral-200 focus:border-neutral-900 focus:bg-white focus:outline-none transition ${
+                        title={needsReview ? 'This value needs review: invalid or out of range for this field' : undefined}
+                        className={`w-full px-2 py-1 text-xs rounded border ${needsReview ? 'border-amber-400 bg-amber-50' : 'border-transparent'} hover:border-neutral-200 focus:border-neutral-900 focus:bg-white focus:outline-none transition ${
                           isBatchOrCode ? 'font-mono font-semibold text-neutral-900' : 'text-neutral-700'
                         } ${!val ? 'placeholder:text-neutral-300' : ''}`}
                       />
@@ -271,14 +205,8 @@ export const QualitySheetGrid: React.FC<QualitySheetGridProps> = ({
 
         {/* Empty State */}
         {filteredRows.length === 0 && (
-          <div className="py-16 text-center">
-            <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center mx-auto mb-3">
-              <AlertCircle className="w-5 h-5 text-neutral-400" />
-            </div>
-            <h3 className="text-sm font-semibold text-neutral-900">No test records loaded</h3>
-            <p className="text-xs text-neutral-500 max-w-sm mx-auto mt-1">
-              Select the sheet test format above and click "Capture New Sheet" to scan an authentic paper QA sheet.
-            </p>
+          <div className="py-14 text-center text-neutral-400 text-xs">
+            No quality records loaded. Click &quot;Scan Document&quot; above to scan a lab quality sheet.
           </div>
         )}
       </div>

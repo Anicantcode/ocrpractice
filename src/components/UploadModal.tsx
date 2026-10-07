@@ -1,10 +1,11 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Upload, X, FileText, CheckCircle2, AlertCircle, Sparkles, RotateCw, RotateCcw } from 'lucide-react';
+import { Camera, Upload, X, FileText, CheckCircle2, AlertCircle, RotateCw, RotateCcw } from 'lucide-react';
+import { rotateImageFile } from '../lib/imageUtils';
 
 interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onUploadFile: (file: File, rotation?: number) => void;
+  onUploadFile: (file: File, sourceFile?: File, rotation?: number) => void;
   isLoading: boolean;
 }
 
@@ -68,9 +69,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (selectedFile) {
-      onUploadFile(selectedFile, rotation);
+      const readyFile = await rotateImageFile(selectedFile, rotation);
+      onUploadFile(readyFile, selectedFile, rotation);
     }
   };
 
@@ -241,7 +243,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             {isLoading ? (
               <>
                 <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin motion-reduce:animate-none" aria-hidden="true" />
-                <span>Processing Document…</span>
+                <span>Scanning Document...</span>
               </>
             ) : (
               <>

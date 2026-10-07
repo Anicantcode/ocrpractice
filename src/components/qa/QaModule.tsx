@@ -6,11 +6,12 @@ import { SapSyncModal } from '../SapSyncModal';
 import { SapConfigModal } from '../SapConfigModal';
 import { SapHistoryModal } from '../SapHistoryModal';
 import { QualityRow, ColumnKey, SapStatus, SapSyncResponse, QaSheetType } from '../../types';
-import { Camera, FileCheck2, Clock } from 'lucide-react';
+import { Camera, FileCheck2, Clock, RotateCcw, Download, Send } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { SHEET_COLUMNS } from '../../lib/constants';
 
 interface QaModuleProps {
   sapStatus: SapStatus | null;
-  paddleReady: boolean;
   onRefreshSapStatus?: () => void;
   isSapConfigOpen: boolean;
   onCloseSapConfig: () => void;
@@ -20,7 +21,6 @@ interface QaModuleProps {
 
 export const QaModule: React.FC<QaModuleProps> = ({
   sapStatus,
-  paddleReady,
   onRefreshSapStatus,
   isSapConfigOpen,
   onCloseSapConfig,
@@ -31,6 +31,8 @@ export const QaModule: React.FC<QaModuleProps> = ({
   const [rows, setRows] = useState<QualityRow[]>([]);
   const [reportId, setReportId] = useState<string>('');
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [imageRotation, setImageRotation] = useState<number>(0);
+  const [rowCoverage, setRowCoverage] = useState<{ expected: number | null; extracted: number; status: 'MATCH' | 'MISMATCH' | 'COUNT_UNCERTAIN' } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Modals & Panels
@@ -46,10 +48,11 @@ export const QaModule: React.FC<QaModuleProps> = ({
     col: 'Batch Number',
   });
 
-  const handleUploadFile = async (file: File, rotation?: number) => {
+  const handleUploadFile = async (file: File, sourceFile?: File, rotation?: number) => {
     setIsLoading(true);
     const formData = new FormData();
     formData.append('file', file);
+    if (sourceFile) formData.append('source_file', sourceFile);
     formData.append('sheet_type', sheetType);
     if (rotation !== undefined) {
       formData.append('rotation', String(rotation));
@@ -64,16 +67,19 @@ export const QaModule: React.FC<QaModuleProps> = ({
         const errText = await res.text();
         throw new Error(errText || 'Failed to process image');
       }
+      const localUrl = URL.createObjectURL(sourceFile || file);
       const data = await res.json();
       setReportId(data.report_id);
-      setImageUrl(data.image_url);
+      setImageUrl(data.image_url || localUrl);
+      setImageRotation(data.image_rotation || 0);
+      setRowCoverage(data.row_coverage || null);
       if (data.sheet_type) {
         setSheetType(data.sheet_type as QaSheetType);
       }
       setRows(data.rows || []);
       setIsUploadOpen(false);
     } catch (err: any) {
-      alert(`OCR Processing Error: ${err.message || err}`);
+      alert(`Scanning Error: ${err.message || err}`);
     } finally {
       setIsLoading(false);
     }
@@ -126,6 +132,22 @@ export const QaModule: React.FC<QaModuleProps> = ({
     });
   };
 
+  const handleExportExcel = () => {
+    if (rows.length === 0) return;
+    const activeColumns = SHEET_COLUMNS[sheetType] || SHEET_COLUMNS['in_process'];
+    const cleanData = rows.map((r) => {
+      const rowObj: Record<string, any> = {};
+      for (const c of activeColumns) {
+        rowObj[c.label] = r[c.key] !== undefined ? r[c.key] : '';
+      }
+      return rowObj;
+    });
+    const worksheet = XLSX.utils.json_to_sheet(cleanData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Quality_Report');
+    XLSX.writeFile(workbook, `Morde_${sheetType}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Report Banner */}
@@ -170,6 +192,24 @@ export const QaModule: React.FC<QaModuleProps> = ({
         </div>
 
         <div className="flex items-center space-x-2.5 flex-shrink-0">
+          <button
+            onClick={handleExportExcel}
+            disabled={rows.length === 0}
+            className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-medium text-neutral-700 bg-white hover:bg-neutral-50 border border-neutral-200/90 transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Download className="w-3.5 h-3.5 text-neutral-500" />
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            onClick={() => setIsSapSyncOpen(true)}
+            disabled={rows.length === 0}
+            className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white bg-neutral-900 hover:bg-neutral-800 shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Sync to SAP</span>
+          </button>
+
           {imageUrl && (
             <button
               onClick={() =>
@@ -182,15 +222,40 @@ export const QaModule: React.FC<QaModuleProps> = ({
             </button>
           )}
 
+          {rows.length > 0 && (
+            <button
+              onClick={() => {
+                setRows([]);
+                setReportId('');
+                setImageUrl('');
+              }}
+              className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-medium text-neutral-600 bg-white hover:bg-neutral-50 border border-neutral-200/90 transition shadow-sm hover:text-red-600 focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:outline-none"
+              title="Clear table and start new slate"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-neutral-400 group-hover:text-red-500" />
+              <span>New Slate</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsUploadOpen(true)}
             className="inline-flex items-center space-x-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold text-white bg-[#E4022D] hover:bg-[#C40226] shadow-sm transition active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#E4022D] focus-visible:outline-none"
           >
             <Camera className="w-4 h-4" aria-hidden="true" />
-            <span>Capture New Sheet</span>
+            <span>Scan Document</span>
           </button>
         </div>
       </div>
+
+      {rowCoverage && (
+        <div className={`mb-3 rounded-lg border px-4 py-2.5 text-xs ${rowCoverage.status === 'MATCH' ? 'border-sky-200 bg-sky-50 text-sky-900' : 'border-amber-300 bg-amber-50 text-amber-900'}`} role="status">
+          {rowCoverage.status === 'MATCH'
+            ? `Visual row-count pass: ${rowCoverage.expected} populated rows; ${rowCoverage.extracted} rows extracted. Please verify against the source.`
+            : rowCoverage.status === 'MISMATCH'
+              ? `Possible missing or extra QA rows: visual count ${rowCoverage.expected}, extracted ${rowCoverage.extracted}. Review against the source.`
+              : 'Could not confidently count populated QA rows. Review the extracted rows against the source.'}
+        </div>
+      )}
 
       {/* Dynamic Multi-Sheet Quality Grid */}
       <QualitySheetGrid
@@ -215,6 +280,7 @@ export const QaModule: React.FC<QaModuleProps> = ({
         isOpen={cropViewer.isOpen}
         onClose={() => setCropViewer((prev) => ({ ...prev, isOpen: false }))}
         imageUrl={imageUrl}
+        imageRotation={imageRotation}
         selectedRow={rows[cropViewer.rowIdx] || null}
         selectedCol={cropViewer.col}
       />

@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { X, ZoomIn, ZoomOut, RotateCcw, Crosshair, Check, Sparkles } from 'lucide-react';
 import { ColumnKey, QualityRow } from '../types';
+import { DocumentPreview } from './DocumentPreview';
 
 interface InspectionCropViewerProps {
   isOpen: boolean;
   onClose: () => void;
   imageUrl: string;
+  imageRotation?: number;
   selectedRow: QualityRow | null;
   selectedCol: ColumnKey | null;
 }
@@ -14,6 +16,7 @@ export const InspectionCropViewer: React.FC<InspectionCropViewerProps> = ({
   isOpen,
   onClose,
   imageUrl,
+  imageRotation = 0,
   selectedRow,
   selectedCol,
 }) => {
@@ -81,13 +84,7 @@ export const InspectionCropViewer: React.FC<InspectionCropViewerProps> = ({
           className="relative transition-transform duration-150 origin-center"
           style={{ transform: `scale(${zoom})` }}
         >
-          <img
-            src={imageUrl}
-            alt="Quality Lab Sheet original document"
-            width="600"
-            height="800"
-            className="max-w-none max-h-[75vh] rounded-lg shadow-2xl border border-[#3D2015] object-contain"
-          />
+          <DocumentPreview src={imageUrl} alt="Quality Lab Sheet original document" rotation={imageRotation} className="max-w-none max-h-[75vh] rounded-lg shadow-2xl border border-[#3D2015] object-contain" />
 
           {/* Highlight Bounding Box overlay in Morde Gold & Red glow */}
           {cropInfo && cropInfo.x_min !== undefined && (

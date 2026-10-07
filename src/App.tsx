@@ -15,7 +15,6 @@ export function App() {
 
   // System & PWA State
   const [sapStatus, setSapStatus] = useState<SapStatus | null>(null);
-  const [paddleReady, setPaddleReady] = useState<boolean>(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [canInstall, setCanInstall] = useState<boolean>(false);
 
@@ -73,10 +72,6 @@ export function App() {
         fetch('/api/health'),
         fetch('/api/sap/status'),
       ]);
-      if (hRes.ok) {
-        const hData = await hRes.json();
-        setPaddleReady(hData.paddle_ready);
-      }
       if (sRes.ok) {
         const sData = await sRes.json();
         setSapStatus(sData);
@@ -172,7 +167,6 @@ export function App() {
         {currentModule === 'qa' && (
           <QaModule
             sapStatus={sapStatus}
-            paddleReady={paddleReady}
             onRefreshSapStatus={fetchHealthAndStatus}
             isSapConfigOpen={isSapConfigOpen}
             onCloseSapConfig={() => setIsSapConfigOpen(false)}

@@ -7,7 +7,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const reportId = body.report_id || `RPT-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
     const title = body.title || 'Quality Lab Sheet';
-    const status = body.status || 'VERIFIED';
+    const status = body.status || 'DRAFT';
     const imageUrl = body.image_url || null;
     const rows = body.rows || [];
 
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
         r.observed_val || '',
         r.status || 'PENDING',
         r.remarks || '',
-        typeof r.confidence === 'number' ? r.confidence : 1.0,
+        typeof r.confidence === 'number' ? r.confidence : null,
         r.sap_lot_no || '',
         r.sap_characteristic_code || `CHAR-00${idx + 1}`
       );

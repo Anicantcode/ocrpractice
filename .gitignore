@@ -15,6 +15,7 @@ archive/
 # Uploads runtime files
 public/uploads/*
 !public/uploads/.gitkeep
+private_uploads/
 
 # Python
 __pycache__/
